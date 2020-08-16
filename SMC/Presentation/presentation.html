@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>An Introduction to Sequential Monte Carlo</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Renny Doig &amp; Zubia Mansoor" />
+    <script src="libs/header-attrs/header-attrs.js"></script>
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# An Introduction to Sequential Monte Carlo
+### Renny Doig &amp; Zubia Mansoor
+
+---
+
+
+
+
+
+
+# Overview
+
+### 1. Review: sequential estimation
+
+### 2. Basic sequential Monte Carlo
+
+### 3. Resampling techniques
+
+### 4. Adaptive resampling
+
+### 5. Example: nonlinear Gaussian state-space model
+
+---
+
+# Sequential Estimation
+
+**Consider the sequential estimation problem:**
+
+  - Sequence of hidden states, `\(\{x_t:t\in\mathbb{N}_1\}=x_{1:t}\)`
+  
+  - Sequence of observed states, `\(\{y_t:t\in\mathbb{N}_1\}=y_{1:t}\)`
+
+&lt;br&gt;  
+--
+
+  - Want to make inference about:
+  
+    - Posterior distribution: `\(\pi_n(x_{1:n}|y_{1:n})\)`
+    
+    - Marginal likelihood of observations: `\(p(y_{1:n})\)`
+    
+    - Expectation of some function, `\(g\)`: `\(~\mathbb E_{\pi_n}[g(X_{1:n})]\)`
+    
+---
+
+# Sequential Importance Sampling
+
+--
+
+**SIS seeks to make inference sequentially by:**
+
+  - Sampling values from proposal distributions `\(q_n(x_n|x_{1:n-1},y_{1:n})\)`
+  
+  - Computing importance weights `\(w_n(X_{1:n})=w_{n-1}(X_{1:n-1})\delta(X_{1:n})\)`
+  
+--
+
+**Gives us estimates:**
+
+  - `\(\hat\pi_n(x_{1:n}|y_{1:n})=\sum_{i=1}^NW_n^i\delta_{X_{1:n}^i}(x_{1:n})\to\)` Posterior distribution
+  
+  - `\(\hat p(y_{1:n})=\frac{1}{N}\sum_{i=1}^Nw_n(X_{1:n})\to\)` Marginal likelihood
+  
+  - `\(\widehat{\mathbb E_\pi[g(X_{1:n})]}=\sum_{i=1}^Ng(X_{1:n})W_n^i\to\)` Expectation of some function `\(g\)`
+  
+--
+
+**Drawback of SIS:**
+
+  - Rapid weight degeneracy
+  
+  - Often very few particles have non-negligible weights
+  
+  - Makes estimates very unstable in long run
+
+---
+
+class: inverse, center, middle
+
+# Resampling
+
+---
+
+# What is resampling?
+
+--
+
+.pull-left[
+**What this means is**
+
+  - Start with `\(N\)` particles having equal weights 
+
+  - Particles are then evaluated and importance weights are computed
+
+  - **Resampling:** Sample N times with *replacement* from the weighted set
+
+  - All the resampled particles are of same size as weights are reset to `\(1/N\)`
+
+  - Move forward **only** the resampled particles
+
+  - *Multinomial resampling*
+]
+
+.pull-right[
+![resmpling](Figures/resampling_fig.png)
+]
+
+---
+
+# Why resampling?
+&lt;br&gt;
+
+--
+
+  - Mitigates the problem of weight degeneracy 
+  
+    - Allows the proposal to better explore higher density regions of the state-space
+  
+    - Resampling essentially reallocates explorers to promising areas
+ 
+&lt;br&gt;  
+
+--
+
+  - Helps us obtain approximate samples according to the target density 
+ 
+---
+
+class: inverse, center, middle
+
+# Sequential Monte Carlo
+ 
+---
+
+# Sequential Monte Carlo
+
+**Sequential Monte Carlo** is a class of methods for approximating sequences of distributions which follow the following general procedure:
+
+--
+
+*At time `\(n=0\)`*
+
+1. *Sample* initial particles `\(\tilde X_0^i\sim q_0(x_0)\)`
+
+1. *Compute* the weights `\(w_0^i(\tilde X_0^i)\)` and `\(W_0^i\propto w_0^i\)`
+
+1. *Resample* `\(\{\tilde X_0^i,W_0^i\}\)` to get `\(\{X_0^i,1/N\}\)`
+
+--
+
+*At time `\(n\ge1\)`:*
+
+1. *Sample* `\(\tilde X_n^i\sim q_n(x_n|X_{0:n-1}^i)\)` and set `\(\tilde X_{0:n}^i\gets(X_{0:n-1}^i,\tilde X_n^i)\)`
+
+1. *Compute* the weights `\(w_n^i(X_{1:n})=w_{n-1}^i\delta(X_{1:n})\)` and `\(W_n^i\propto w_n^i\)`
+
+1. *Resample* `\(\{\tilde X_{0:n}^i,W_n^i\}\)` to get `\(\{X_{0:n}^i,1/N\}\)`
+
+---
+
+class: inverse, center, middle
+
+# Resampling Techniques
+
+---
+
+# Resampling Techniques
+
+**Systematic resampling**
+
+  - Very popular resampling technique
+    
+    1. Sample  `\(U^1 \sim ~\text{Unif}\left(0,\frac{1}{N}\right)\)`
+    
+    1. Define `\(U^i = U+\frac{i-1}{N},~~i=2,\ldots,N\)`
+    
+    1. Set `\(N_n^i=\left|\left\{U^j: \sum_{k=1}^{i-1}W_n^k\le U^j\le\sum_{k=1}^iW_n^k\right\}\right|\)`
+
+  &lt;!-- - Cannot easily compute variance of the IS estimate --&gt;
+    
+  - Empirically lower variance estimates than other methods
+  
+  - No theoretical guarantees
+    
+  &lt;!-- - Empirically, performs better than most other methods  --&gt;
+
+--
+
+**Residual sampling** 
+
+  - Set the `\(N_n^i\)` to be `\(\lfloor NW^i_n\rfloor\)`, plus a randomly distributed remainder term `\(N - \sum_{i=1}^N\lfloor NW^i_n\rfloor\)`
+  
+  - Guaranteed lower variance estimates than multinomial sampling
+
+
+---
+
+class: inverse, center, middle
+
+# Adaptive Resampling
+
+---
+
+# Trade-off with Resampling
+
+**Et tu, resampling?**
+
+  - Shown resampling improves stability of estimates by mitigating weight degeneracy
+  
+  - Actually adds variance to immediate estimate `\(\widehat{\mathbb E_{\pi_n}(g(X_{1:n}))}\)`
+  
+  - So there is a trade-off: resampling improves long-term stability at cost of immediate precision
+  
+--
+
+&lt;br&gt;
+&lt;br&gt;
+
+**How do we fix this?**
+
+  - Strike balance between resampling at every step, and never resampling
+  
+  - Now need a measurement of degeneracy
+
+---
+
+# Effective Sample Size
+
+**Want a measure of the degeneracy in a sample of weighted particles:**
+
+  - In class discussed *effective sample size (ESS)*, `\(N_\text{eff}\)`
+  
+  - If we have `\(N\)` weighted particles, they are "worth" `\(N_\text{eff}\)` i.i.d. samples from our target distribution
+
+  - Can estimate `\(N_{\text{eff}}\)` by
+`$$\widehat{N_\text{eff}}=\left[\sum_{i=1}^N\left(W^i\right)^2\right]^{-1}$$`
+
+    - `\(\widehat{N_\text{eff}}=N\)` iff `\(W^i=\frac{1}{N}\)` `\(\forall i\)`
+    - `\(\widehat{N_\text{eff}}=1\)` iff `\(W^i=1\)` for exactly one `\(i\)`
+
+--
+
+&lt;br&gt;
+
+**Alternative measures of weight degeneracy:**
+
+  - Coefficient of variation of the normalized weights
+  
+  - Shannon entropy of the normalized weights
+  
+---
+
+# Adaptive Resampling
+
+**We have established:**
+
+  1. Resampling at every step introduces unnecessary variance to our IS estimates
+  
+  1. A rule of thumb for measuring weight degeneracy in a sample of particles
+
+--
+
+&lt;br&gt;
+&lt;br&gt;
+
+*Adaptive resampling* combines these two notions:
+
+  - Instead of resampling at every step, only resample when particle degeneracy reaches a certain threshold
+
+  - `\(\widehat{N_\text{eff}}=0.5N\)` is widely used as such a threshold
+  
+  - This gives us the benefit of resampling while minimizing the costs
+
+---
+
+class: inverse, center, middle
+
+# Example: Nonlinear Gaussian State-Space Model
+
+---
+
+# Nonlinear Gaussian State-Space Model
+
+**A nonlinear Gaussian state-space model** is characterized by the following two equations:
+`\begin{align}
+    X_t &amp;= f(X_{t-1})+V_t, &amp;V_t\sim\mathcal{N}(0,\Sigma_V)\\
+    Y_t &amp;= CX_t+W_t, &amp;W_t\sim\mathcal{N}(0,\Sigma_W)
+\end{align}`
+
+  - `\(X_t\in\mathbb{R}^{n_x}\)` and `\(Y_t\in\mathbb{R}^{n_y}\)`
+  
+  - `\(f:\mathbb{R}^{n_x}\to\mathbb{R}^{n_x}\)` is nonlinear
+  
+  - `\(C\)` is a `\(n_y\times n_x\)` *observation matrix*
+
+--
+
+&lt;br&gt;
+&lt;br&gt;
+
+Two popular methods for solving this system:
+
+  - Sequential Monte Carlo
+  
+  - Extended Kalman Filter (not discussed here)
+
+---
+
+# Proposal Distribution &amp; Importance Weight
+
+**Proposal density:**
+
+  - The optimal proposal density, `\(q_n^\text{opt}(x_n|x_{n-1}^i,y_n)\)` is not always tractable
+  
+  - In this case we can derive it exactly
+  
+  - Can show that `\(X_n^i|X_{n-1},y_n\sim \mathcal{N}(m_n,\Sigma)\)` is optimal
+  
+    - `\(\Sigma^{-1}=\Sigma_V^{-1}+C^T\Sigma_W^{-1}C\)`
+    
+    - `\(m_n=\Sigma\left(\Sigma^{-1}f(X_{n-1})+C^T\Sigma_W^{-1}y_n\right)\)`
+    
+--
+
+&lt;br&gt;
+
+**Importance weight function:**
+
+  - Corresponding importance weight is `\(w_n^i=w_{n-1}^i~p(y_n|x_{n-1})\)`
+  
+  - Can show that here, `\(p(y_n|x_{n-1})\propto\exp\left[-\frac{1}{2}(y_n-Cf(X_{n-1}))^T(\Sigma_V+C\Sigma_WC^T)^{-1}(y_n-Cf(X_{n-1}))\right]\)`
+
+---
+
+# This Example
+
+To demonstrate SMC we will simulate data from the following state-space model:
+`\begin{align}
+    X_t &amp;= \sin(X_{t-1})+V_t,~V_t\sim\mathcal{N}(0,1)\\
+    Y_t &amp;= 2X_t+W_t,~W_t\sim\mathcal{N}(0,1)
+\end{align}`
+
+&lt;img src="presentation_files/figure-html/unnamed-chunk-2-1.png" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Defining Parameters
+
+
+```r
+# set parameters of the state-space model
+n &lt;- 100
+sig.V &lt;- 1
+sig.W &lt;- 1
+C &lt;- 2
+f &lt;- function(x){ return(sin(x)) }
+```
+
+--
+
+
+```r
+## set parameters of the SMC
+# number of particles
+N &lt;- 1000 
+
+# proposal mean function and variance
+Sig &lt;- 1/(1/sig.V^2+C^2/sig.W^2)
+m &lt;- function( x, y ){ return( Sig*(f(x)/sig.V^2+C*y/sig.W^2) ) }
+
+# incremental weight update function
+S &lt;- 1/(sig.V^2+C^2*sig.W^2)
+w_func &lt;- function( x, y ){ return( exp(-(y-C*f(x))^2*S/2) ) }
+```
+
+---
+
+# Implementing SMC
+
+
+```r
+for( i in 1:n )
+{
+  Z[i,] &lt;- rnorm(N, mean=m(Z[i-1,],Y[i]), sd=sqrt(Sig)) # generate proposal from N(m,Sig)
+  
+  w[i,] &lt;- w[i-1,]*w_func( Z[i-1,], Y[i] ) # compute the unnormalized weights
+  
+  W &lt;- w[i,]/sum(w[i,]) # normalize the weights
+  
+  ESS &lt;- 1/sum(W^2) # compute the ESS
+  
+  if( ESS&lt;(0.5*N) ) # resample if ESS&lt;0.5N
+  {
+    # resampling
+    Z &lt;- Z[,systematic_resample(W)]
+    # reset the weights
+    w[i,] &lt;- rep(1,N)
+  }
+}
+```
+
+---
+
+# Results
+
+Below is a plot showing the 95% credible interval about `\(\pi_n(x_{0:n}|y_{1:n})\)` along with the mean of the sequence
+
+&lt;img src="presentation_files/figure-html/unnamed-chunk-6-1.png" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Weight Degeneracy
+
+To show how resampling improves the issue of weight degeneracy:
+
+.pull-left[
+![smc_weights](Figures/smc_weights.gif)
+]
+
+.pull-right[
+![sis_weights](Figures/sis_weights.gif)
+]
+
+---
+
+# Terminology
+
+Sequential Monte Carlo `\(\supset\)` particle filter `\(\supset\)` bootstrap filter
+
+--
+
+&lt;br&gt;
+
+  - Sequential Monte Carlo is a general class of particle methods which are composed of *sample*, *weight*, and *resample* steps
+  
+&lt;br&gt;
+  
+  - Particle filters specifically use past observations to make inference about the present
+
+&lt;br&gt;
+
+  - Bootstrap filter is a particle filter which uses the prior density, `\(f(x_t|x_{t-1})\)` as a proposal
+  
+    - Popular choice for its simplicity, not its optimality
+    
+---
+
+# Closing Remarks
+
+**Sequential Monte Carlo is an imperfect solution:**
+
+  - "It is inherently impossible to accurately represent a distribution on a space of arbitratily high dimension with a sample of fixed, finite size"
+  
+--
+
+  - Particle degeneracy is unavoidable for a long enough sequence
+  
+  - There is hope!
+  
+    - Versions of SMC such as *resample-move* and *block SMC* exist to further mitigate degeneracy
+    
+--
+
+&lt;br&gt;
+
+**Some other interesting extensions of SMC:**
+
+  - *Auxiliary particle filter*: uses a "look-ahead" approach when computing importance weights
+  
+  - *Annealed importance sampling*: targets static posterior distributions through a sequence of intermediate distributions
+  
+  - `\(SMC^2\)`: combination of SMC and PMCMC to estimate model parameters
+
+---
+
+# Closing Remarks
+
+- Sequential Monte Carlo is a broad class of particle methods
+
+  - Efficiently estimates sequences of distributions
+
+  - Consists of 3 general steps: *Sample*, *Weight*, *Resample*
+  
+  - Many extensions for static distributions, parameter estimation, etc.
+
+&lt;br&gt;
+
+- Alternative sampling schemes &amp; adaptive resampling to optimize the the resampling step
+
+
+---
+
+class: inverse, center, middle
+
+# Thank you!
+## Questions?
+
+---
+
+# References
+
+*General:*
+- Doucet, A. and Johansen, M. (2009). *A Tutorial on Particle Filtering and Smoothing: Fifteen years later*. Handbook of Nonlinear Filtering.
+
+*Effective Sample Size:*
+- Liu, S. (2001). *Monte Carlo Strategies in Scientific Computing*. Springer.
+
+*Resampling:*
+- Douc, R., Cappe, O., and Moulines, E. (2005). *Comparison of Resampling Schemes for Particle Filtering*. Proceedings of the 4th International Symposium on Image and Signal Procesing and Analysis.
+
+- Carpenter, J. and Fearnhead, P. (2000). *An Improved Particle Filter for Non-linear Problems*. IEE Proc. Radar, Sonar Navig.
+
+*Nonlinear Gaussian State-Space Model:*
+- Doucet, A., Godsill, S., Andieu, C. (2000). *On sequential Monte Carlo sampling methods for Bayesian filtering*. Statistics and Computing.
+
+---
+
+# Appendix A
+## Intuition behind effective sample size
+
+**To gain intuition behind what effective sample size is, consider the following:**
+
+  - Suppose you have `\(X_1,\ldots,X_N\)` i.i.d. samples from a distribution with mean `\(\mu\)` and variance `\(\sigma^2\)`
+  
+  - Then `\(\mathbb{Var}[\bar X]=\sigma^2/N\)`
+  
+  - However, if the samples are not independent then our variance will be greater: `$$\mathbb{Var}[\bar X]=\sigma^2/N_\text{eff},~~N_\text{eff}\le N$$`
+  
+--
+
+&lt;br&gt;
+
+**Can think of weighted samples as correlated**
+
+  - In the sense that for one particle increase in weight another must decrease
+
+---
+
+# Appendix B
+## Effective sample size: SMC vs. SIS
+
+&lt;img src="presentation_files/figure-html/unnamed-chunk-7-1.png" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Appendix C
+## Effect of proposal: optimal
+
+&lt;img src="presentation_files/figure-html/unnamed-chunk-8-1.png" style="display: block; margin: auto;" /&gt;
+---
+
+# Appendix C
+## Effect of proposal: prior
+
+&lt;img src="presentation_files/figure-html/unnamed-chunk-9-1.png" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Appendix D
+## Choosing suboptimal proposals
+
+**What if our optimal proposal distribution is intractable?**
+
+  - Find reasonable suboptimal approximation of the optimal proposal
+  
+    - Local linearisation of the model or the proposal density
+    
+    - Not a straight-forward approach and is model-specific
+    
+--
+
+&lt;br&gt;
+
+  - Use our prior (transition) density, `\(f(x_t|x_{t-1})\)` as our proposal
+  
+    - This implies an incremental weight update of `\(p(y_t|x_t)\)`
+    
+    - Very easy to implement
+    
+    - In the filtering context, referred to as the *Bootstrap filter*
+    
+---
+
+# Appendix E
+## Implementing systematic resampling
+
+
+```r
+systematic_resample &lt;- function( W ){
+  K &lt;- length(W)
+  U &lt;- runif(1,0,1/K) + 0:(K-1)/K
+  
+  W.sum &lt;- cumsum(W)
+  N &lt;- rep(NA,K)
+  j &lt;- 1
+  for( i in 1:K )
+  {
+    found = F
+    while( !found )
+    {
+      if( U[i]&gt;W.sum[j] )
+        j &lt;- j+1
+      else
+        found = T
+    }
+    N[i] &lt;- j
+  }
+  
+  return( N )
+}
+```
+
+---
+
+# Appendix F
+## Residual resampling
+
+
+
+Residual sampling defines `\(N^i=\lfloor NW^i\rfloor+\bar N^i\)`
+
+  - `\(\bar N^1,\ldots,\bar N^N\sim\text{Multi}\left(N-R,\bar W^1,\ldots,\bar W^N\right)\)`
+  
+  - `\(R = \sum_{i=1}^N\lfloor NW^i\rfloor\)`
+  
+  - `\(\bar W^i=\frac{NW^i-\lfloor NW^i\rfloor}{N-R}\)`
+  
+    - Weights for which the difference `\(NW^i-\lfloor NW^i\rfloor\)` is close to 1 will have greater remainder weight
+  
+--
+
+&lt;br&gt;
+
+So each particle produces `\(\lfloor NW^i\rfloor\)` 'offspring' plus some random remainder
+
+  - Also called "stochastic remainder resampling" in genetic algorithm literature
+
+---
+
+# Appendix G
+## Alternative degeneracy measures
+
+.pull-left[
+**Coefficient of variation of the normalized weights**
+
+  - `\(\text{CV}_N = \left[\frac{1}{N}\sum_{i=1}^N\left(NW^i-1\right)^2\right]\)`
+
+    - `\(\text{CV}_N=0\)` iff `\(W^i=\frac{1}{N}\)` for all `\(i\)`
+  
+    - `\(\text{CV}_N=\sqrt{N-1}\)` iff `\(W^i=1\)` for one `\(i\)`
+]
+
+--
+
+.pull-right[
+**Shannon entropy of the normalized weights**  
+
+  - `\(\text{Ent}=-\sum_{i=1}^NW^i\log_2W^i\)`
+
+    - `\(\text{Ent}=\log_2N\)` iff `\(W^i=\frac{1}{N}\)` for all `\(i\)`
+  
+    - `\(\text{Ent}=0\)` iff `\(W^i=1\)` for one `\(i\)`
+]
+
+---
+
+# Appendix H
+## Choosing a resampling technique
+
+- Want to choose a resampling technique which yields lower variance estimates than multinomial resampling
+
+--
+
+&lt;br&gt;
+
+- Generally need to satisfy a few requirements
+
+  1. "Unbiasedness": `\(\mathbb E[N^i]=NW^i\)`
+  
+  1. Particles are equally weighted after resampling
+  
+  1. Total number of particles does not change
+  
+--
+
+&lt;br&gt;
+
+- There are some exceptions
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false,
+"ratio": "16:9"
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
